@@ -7,6 +7,7 @@ const cors = require('cors');
 
 const router = require('./router/index');
 const errorMiddleware = require('./middleware/error.middleware');
+const TradingService = require('./services/trading.service');
 
 const PORT = process.env.PORT || 5000;
 
@@ -32,6 +33,8 @@ const start = async () => {
         });
 
         server.listen(PORT, () => console.log(`Server started on PORT = ${PORT}`));
+
+        TradingService.startBotsFromDB();
     } catch (e) {
         console.log(e);
     }

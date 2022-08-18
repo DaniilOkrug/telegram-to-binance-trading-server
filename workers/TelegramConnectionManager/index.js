@@ -35,7 +35,6 @@ class TelegramConnectionManager {
           switch (task.type) {
             case "CONNECTION":
               return resolve(task);
-              break;
 
             case "CODE_CONFIRMED":
               workerInfo = this.#workers.find((data) => data.apiId === apiId);
@@ -64,9 +63,9 @@ class TelegramConnectionManager {
             case "TERMINATE":
               worker.terminate();
               return;
-              break;
 
             default:
+              console.log("Неизветная команда для TelegramConnectionManager");
           }
         });
       } catch (err) {

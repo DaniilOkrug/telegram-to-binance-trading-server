@@ -1,6 +1,7 @@
 const Binance = require("node-binance-api");
 const TokenService = require("./token.service");
 const BinanceAccountModel = require("../models/binanceAccount.model");
+const binanceAccountModel = require("../models/binanceAccount.model");
 
 class BinanceService {
   async connect(refreshToken, key, secret) {
@@ -13,7 +14,7 @@ class BinanceService {
     });
 
     try {
-      const response = await binance.futuresаMarketBuy("ETHUSDT", 1);
+      const response = await binance.futuresMarketBuy("ETHUSDT", 1);
 
       if (response.code) {
         if (response.code == -2014) {
@@ -24,21 +25,21 @@ class BinanceService {
         }
       }
 
-      const userData = await TokenService.validateRefreshToken(refreshToken);
+      const userData = TokenService.validateRefreshToken(refreshToken);
       const binanceAccountData = await BinanceAccountModel.findOne({
         user: userData.id,
       });
 
       if (binanceAccountData) {
-        await BinanceAccountModel.findOneAndUpdate({user: userData.id}, {
-            key,
-            secret
-          });
+        await BinanceAccountModel.findOneAndUpdate({ user: userData.id }, {
+          key,
+          secret
+        });
       } else {
         await BinanceAccountModel.create({
-            user: userData.id,
-            key,
-            secret
+          user: userData.id,
+          key,
+          secret
         })
       }
 
@@ -47,6 +48,7 @@ class BinanceService {
         secret,
       };
     } catch (err) {
+      console.log(err);
       const response = {
         type: "ERROR",
         message: "Ошибка подключения",
@@ -59,6 +61,24 @@ class BinanceService {
       }
 
       return response;
+    }
+  }
+
+  async getAccount(refreshToken) {
+    const userData = TokenService.validateRefreshToken(refreshToken);
+
+    const binanceAccountData = await binanceAccountModel.findOne({ user: userData.id });
+
+    if (binanceAccountData) {
+      return {
+        key: binanceAccountData.key,
+        secret: binanceAccountData.secret
+      }
+    } else {
+      return {
+        key: "",
+        secret: ""
+      }
     }
   }
 }
