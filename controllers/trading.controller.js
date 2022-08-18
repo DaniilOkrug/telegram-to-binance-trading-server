@@ -20,7 +20,7 @@ class TradingController {
     try {
       const { refreshToken } = req.cookies;
 
-      console.log(refreshToken);
+      console.log(req);
 
       const response = await TradingService.getAccountStatus(refreshToken);
 
