@@ -6,6 +6,8 @@ class TradingController {
     try {
       const { refreshToken } = req.cookies;
 
+      console.log(refreshToken);
+
       const response = await TradingService.getChannels(refreshToken);
 
       return res.json(response);
@@ -17,6 +19,8 @@ class TradingController {
   async getAccountStatus(req, res, next) {
     try {
       const { refreshToken } = req.cookies;
+
+      console.log(refreshToken);
 
       const response = await TradingService.getAccountStatus(refreshToken);
 
