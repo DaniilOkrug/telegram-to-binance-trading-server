@@ -34,12 +34,20 @@ class TokenService {
     }
   }
 
+  getTokenFromRequest(req) {
+    if (req?.headers?.authorization) {
+      return req.headers.authorization.replace('Bearer ', "");
+    }
+
+    return null;
+  }
+
   async saveToken(userId, refreshToken) {
     const tokenData = await tokenModel.findOne({ user: userId });
 
     if (tokenData) {
       tokenData.refreshToken = refreshToken;
-      
+
       return tokenData.save();
     }
 
