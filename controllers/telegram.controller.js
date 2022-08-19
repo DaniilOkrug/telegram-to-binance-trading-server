@@ -46,9 +46,11 @@ class TelegramController {
       const response = await TelegramService.code(apiId, apiHash, authCode);
 
       if (response.type === "CODE_CONFIRMED") {
-        return res.json({
-          status: "Code confirmed",
-        });
+        const accessToken = tokenService.getAccessTokenFromRequest(req);
+        if (!accessToken)
+          throw ApiError.UnauthorizedError("Вы не авторизованы");
+
+        return res.json(await tradingService.getAccountStatus(accessToken));
       }
 
       if (response.type === "ERROR") {

@@ -2,6 +2,7 @@ const ApiError = require("../exceptions/api.error");
 const BinanceAccountModel = require("../models/binanceAccount.model");
 const BinanceService = require("../services/binance.service");
 const tokenService = require("../services/token.service");
+const tradingService = require("../services/trading.service");
 
 class BinanceController {
   async connect(req, res, next) {
@@ -22,7 +23,7 @@ class BinanceController {
         return next(ApiError.BadRequest(response.message));
       }
       
-      return res.json(response);
+      return res.json(await tradingService.getAccountStatus(accessToken));
     } catch (e) {
       next(e);
     }
