@@ -50,7 +50,8 @@ class TelegramController {
         if (!accessToken)
           throw ApiError.UnauthorizedError("Вы не авторизованы");
 
-        return res.json(await tradingService.getAccountStatus(accessToken));
+        const userData = tokenService.validateAccessToken(accessToken);
+        return res.json(await TelegramService.getAccount(accessToken));
       }
 
       if (response.type === "ERROR") {
