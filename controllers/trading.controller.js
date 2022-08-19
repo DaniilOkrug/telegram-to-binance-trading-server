@@ -1,14 +1,14 @@
 const ApiError = require("../exceptions/api.error");
+const tokenService = require("../services/token.service");
 const TradingService = require("../services/trading.service");
 
 class TradingController {
   async getChannels(req, res, next) {
     try {
-      const { refreshToken } = req.cookies;
+      const accessToken = tokenService.getAccessTokenFromRequest(req);
+      if (!accessToken) throw ApiError.UnauthorizedError("Вы не авторизованы");
 
-      console.log(refreshToken);
-
-      const response = await TradingService.getChannels(refreshToken);
+      const response = await TradingService.getChannels(accessToken);
 
       return res.json(response);
     } catch (e) {
@@ -18,11 +18,10 @@ class TradingController {
 
   async getAccountStatus(req, res, next) {
     try {
-      const { refreshToken } = req.cookies;
+      const accessToken = tokenService.getAccessTokenFromRequest(req);
+      if (!accessToken) throw ApiError.UnauthorizedError("Вы не авторизованы");
 
-      console.log(req);
-
-      const response = await TradingService.getAccountStatus(refreshToken);
+      const response = await TradingService.getAccountStatus(accessToken);
 
       return res.json(response);
     } catch (e) {
@@ -32,11 +31,13 @@ class TradingController {
 
   async addChannel(req, res, next) {
     try {
-      const { refreshToken } = req.cookies;
+      const accessToken = tokenService.getAccessTokenFromRequest(req);
+      if (!accessToken) throw ApiError.UnauthorizedError("Вы не авторизованы");
+
       const { telegramSettings, binanceSettings } = req.body;
 
       const response = await TradingService.addChannel(
-        refreshToken,
+        accessToken,
         telegramSettings,
         binanceSettings
       );
@@ -49,11 +50,13 @@ class TradingController {
 
   async deleteChannel(req, res, next) {
     try {
-      const { refreshToken } = req.cookies;
+      const accessToken = tokenService.getAccessTokenFromRequest(req);
+      if (!accessToken) throw ApiError.UnauthorizedError("Вы не авторизованы");
+
       const { channelName } = req.body;
 
       const response = await TradingService.deleteChannel(
-        refreshToken,
+        accessToken,
         channelName
       );
 

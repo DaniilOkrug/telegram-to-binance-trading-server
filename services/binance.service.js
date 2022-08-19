@@ -4,7 +4,7 @@ const BinanceAccountModel = require("../models/binanceAccount.model");
 const binanceAccountModel = require("../models/binanceAccount.model");
 
 class BinanceService {
-  async connect(refreshToken, key, secret) {
+  async connect(accessToken, key, secret) {
     const binance = new Binance().options({
       APIKEY: key,
       APISECRET: secret,
@@ -25,22 +25,25 @@ class BinanceService {
         }
       }
 
-      const userData = TokenService.validateRefreshToken(refreshToken);
+      const userData = TokenService.validateAccessToken(accessToken);
       const binanceAccountData = await BinanceAccountModel.findOne({
         user: userData.id,
       });
 
       if (binanceAccountData) {
-        await BinanceAccountModel.findOneAndUpdate({ user: userData.id }, {
-          key,
-          secret
-        });
+        await BinanceAccountModel.findOneAndUpdate(
+          { user: userData.id },
+          {
+            key,
+            secret,
+          }
+        );
       } else {
         await BinanceAccountModel.create({
           user: userData.id,
           key,
-          secret
-        })
+          secret,
+        });
       }
 
       return {
@@ -64,21 +67,23 @@ class BinanceService {
     }
   }
 
-  async getAccount(refreshToken) {
-    const userData = TokenService.validateRefreshToken(refreshToken);
+  async getAccount(accessToken) {
+    const userData = TokenService.validateAccessToken(accessToken);
 
-    const binanceAccountData = await binanceAccountModel.findOne({ user: userData.id });
+    const binanceAccountData = await binanceAccountModel.findOne({
+      user: userData.id,
+    });
 
     if (binanceAccountData) {
       return {
         key: binanceAccountData.key,
-        secret: binanceAccountData.secret
-      }
+        secret: binanceAccountData.secret,
+      };
     } else {
       return {
         key: "",
-        secret: ""
-      }
+        secret: "",
+      };
     }
   }
 }

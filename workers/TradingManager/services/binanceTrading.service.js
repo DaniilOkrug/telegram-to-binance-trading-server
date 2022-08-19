@@ -28,11 +28,15 @@ class BinanceTradingService {
   openOrder(signalData, binanceSettings) {
     return new Promise(async (resolve, reject) => {
       //Задаем плечо
-      await this.#binance.futuresLeverage(signalData.symbol, binanceSettings.leverage);
+      await this.#binance.futuresLeverage(
+        signalData.symbol,
+        binanceSettings.leverage
+      );
 
       const price = (await this.#binance.futuresPrices())[signalData.symbol];
 
-      const qty = binanceSettings.positionSize * binanceSettings.leverage / price;
+      const qty =
+        (binanceSettings.positionSize * binanceSettings.leverage) / price;
 
       //Открытие основной позиции
       const mainOrder = [
@@ -168,7 +172,7 @@ class BinanceTradingService {
       //Проверка ошибки при выставлении оредров
       for (const binanceResponse of ordersResponse) {
         if (!binanceResponse.orderId) {
-        //   logger.error(binanceLongResponse);
+          //   logger.error(binanceLongResponse);
           console.log("Canceling all orders due to one of the orders error!");
 
           //Закрытие позиции
@@ -221,20 +225,8 @@ class BinanceTradingService {
   }
 
   getPairsData() {
-    return new Promise((resolve, reject) => {
-      try {
-        this.#binance.exchangeInfo((err, data) => {
-          try {
-            if (err) throw err;
-
-            return resolve(data);
-          } catch (err) {
-            reject(err);
-          }
-        });
-      } catch (err) {
-        console.log(err);
-      }
+    return new Promise(async (resolve, reject) => {
+      resolve(await this.#binance.futuresExchangeInfo())
     });
   }
 
@@ -277,6 +269,10 @@ class BinanceTradingService {
       try {
         const pairInfo = this.pairsData.find((data) => data.symbol === symbol);
 
+        console.log(this.pairsData.map(data => data.symbol));
+
+        if(!pairInfo) return resolve(volume);
+
         const volumeFilter = pairInfo.filters.find(
           (filter) => filter.filterType === "LOT_SIZE"
         );
@@ -312,7 +308,9 @@ class BinanceTradingService {
         resolve(volume);
       } catch (err) {
         console.log(err);
-        reject(err);
+
+        //! При ошибке возвращает первоначальный объем
+        resolve(volume);
       }
     });
   }

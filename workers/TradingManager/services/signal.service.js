@@ -1,3 +1,5 @@
+const TelegramSettingsMiddleWare = require("../../../middleware/telegramSettings.middleware");
+
 class SignalService {
   /**
    * Определяет является ли сообщение сигналом
@@ -30,8 +32,10 @@ class SignalService {
     }
   }
 
-  isSignal(message, signalWordsLong) {
-    for (const word of signalWordsLong) {
+  isSignal(message, words) {
+    const wordsArr = Array.isArray(words) ? words : TelegramSettingsMiddleWare.parseSignalWords(words);
+
+    for (const word of wordsArr) {
       if (message.includes(word)) {
         return true;
       }

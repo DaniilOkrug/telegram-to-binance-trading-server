@@ -34,7 +34,7 @@ class TokenService {
     }
   }
 
-  getTokenFromRequest(req) {
+  getAccessTokenFromRequest(req) {
     if (req?.headers?.authorization) {
       return req.headers.authorization.replace('Bearer ', "");
     }

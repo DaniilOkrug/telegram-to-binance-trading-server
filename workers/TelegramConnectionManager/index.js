@@ -3,18 +3,18 @@ const { Worker } = require("worker_threads");
 class TelegramConnectionManager {
   #workers = [];
 
-  createWorker(refreshToken, apiId, apiHash, phoneNumber) {
+  createWorker(accessToken, apiId, apiHash, phoneNumber) {
     return new Promise((resolve, reject) => {
       try {
         const worker = new Worker(
           "./workers/TelegramConnectionManager/worker.js",
-          { workerData: { refreshToken, apiId, apiHash, phoneNumber } }
+          { workerData: { accessToken, apiId, apiHash, phoneNumber } }
         );
 
         this.#workers.push({
           instance: worker,
           isConnectionRequest: true,
-          refreshToken,
+          accessToken,
           apiId,
           apiHash,
           phoneNumber,

@@ -1,13 +1,10 @@
 const TelegramConnectionManager = require("../workers/TelegramConnectionManager");
-const tokenService = require("./token.service");
-const ApiError = require("../exceptions/api.error");
-
 const TelegramAccountModel = require("../models/telegramAccount.model");
 
 class TelegramService {
-  async connect(refreshToken, apiId, apiHash, phoneNumber) {
+  async connect(accessToken, apiId, apiHash, phoneNumber) {
     const response = await TelegramConnectionManager.createWorker(
-      refreshToken,
+      accessToken,
       apiId,
       apiHash,
       phoneNumber

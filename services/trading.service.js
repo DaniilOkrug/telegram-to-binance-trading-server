@@ -59,8 +59,8 @@ class TradingService {
     }
   }
 
-  async getChannels(refreshToken) {
-    const userData = tokenService.validateRefreshToken(refreshToken);
+  async getChannels(accessToken) {
+    const userData = tokenService.validateAccessToken(accessToken);
 
     const userChannelsData = await TelegramTradingChannelsModel.find({
       user: userData.id,
@@ -75,7 +75,7 @@ class TradingService {
     });
   }
 
-  async addChannel(refreshToken, telegramSettings, binanceSettings) {
+  async addChannel(accessToken, telegramSettings, binanceSettings) {
     const signalWordsLongArr = TelegramSettingsMiddleware.parseSignalWords(
       telegramSettings.signalWordsLong
     );
@@ -91,7 +91,7 @@ class TradingService {
 
     const startedWorkers = TradingManager.getWorkers();
 
-    const userData = tokenService.validateRefreshToken(refreshToken);
+    const userData = tokenService.validateAccessToken(accessToken);
 
     const userWorker = startedWorkers.find(
       (workerData) => workerData.userId === userData.id
@@ -155,10 +155,7 @@ class TradingService {
             telegramSettings,
             binanceSettings,
           });
-
-          return {
-            channelName: telegramSettings.channelName,
-          };
+          break;
 
         case "CONNECTION_ERROR":
           throw ApiError.BadRequest(workerResponse.message);
@@ -168,13 +165,13 @@ class TradingService {
       }
     }
 
-    return await this.getChannels(refreshToken);
+    return await this.getChannels(accessToken);
   }
 
-  async deleteChannel(refreshToken, channelName) {
+  async deleteChannel(accessToken, channelName) {
     if (channelName === "") throw ApiError.BadRequest("Название канала пустое");
 
-    const userData = tokenService.validateRefreshToken(refreshToken);
+    const userData = tokenService.validateAccessToken(accessToken);
 
     const userChannelsData = await TelegramTradingChannelsModel.find({
       user: userData.id,
@@ -202,11 +199,11 @@ class TradingService {
 
     await TelegramTradingChannelsModel.findByIdAndDelete(channelData.id);
 
-    return await this.getChannels(refreshToken);
+    return await this.getChannels(accessToken);
   }
 
-  async getAccountStatus(refreshToken) {
-    const userData = tokenService.validateRefreshToken(refreshToken);
+  async getAccountStatus(accessToken) {
+    const userData = tokenService.validateAccessToken(accessToken);
 
     const telegramAccountData = await TelegramAccountModel.findOne({
       user: userData.id,

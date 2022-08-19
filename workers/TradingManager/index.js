@@ -34,7 +34,13 @@ class TradingManager {
    * @param {string[]} signalWordsShort
    * @returns
    */
-  createWorker(userId, telegramConnection, binanceConnection, telegramSettings, binanceSettings) {
+  createWorker(
+    userId,
+    telegramConnection,
+    binanceConnection,
+    telegramSettings,
+    binanceSettings
+  ) {
     return new Promise((resolve, reject) => {
       try {
         const worker = new Worker("./workers/TradingManager/worker.js", {
@@ -169,9 +175,15 @@ class TradingManager {
       const waitResponse = () => {
         return new Promise((resolveWait) => {
           const timer = setInterval(() => {
-            if (!this.#workers[workerIndex].addChannel.waitResponse)
+            try {
+              if (!this.#workers[workerIndex].addChannel.waitResponse) {
+                resolveWait();
+                clearInterval(timer);
+              }
+            } catch (err) {
               resolveWait();
               clearInterval(timer);
+            }
           }, 1000);
         });
       };
@@ -208,13 +220,12 @@ class TradingManager {
         })
       );
 
-
       const waitResponse = () => {
         return new Promise((resolveWait) => {
           const timer = setInterval(() => {
             if (!this.#workers[workerIndex].deleteChannel.waitResponse)
               resolveWait();
-              clearInterval(timer);
+            clearInterval(timer);
           }, 200);
         });
       };

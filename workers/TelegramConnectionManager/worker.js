@@ -74,7 +74,7 @@ parentPort.on("message", async (code) => {
 
     const telegramAuthToken = client.session.save();
 
-    const userData = tokenService.validateRefreshToken(workerData.refreshToken);
+    const userData = tokenService.validateAccessToken(workerData.accessToken);
 
     const telegramDataCondition = {
       user: userData.id,

@@ -1,15 +1,17 @@
-const TelegramService = require("../services/telegram.service");
-const TokenService = require("../services/token.service");
 const ApiError = require("../exceptions/api.error");
+const TelegramService = require("../services/telegram.service");
+const tokenService = require("../services/token.service");
 
 class TelegramController {
   async connect(req, res, next) {
     try {
-      const { refreshToken } = req.cookies;
+      const accessToken = tokenService.getAccessTokenFromRequest(req);
+      if (!accessToken) throw ApiError.UnauthorizedError("Вы не авторизованы");
+
       const { apiId, apiHash, phoneNumber } = req.body;
 
       const response = await TelegramService.connect(
-        refreshToken,
+        accessToken,
         apiId,
         apiHash,
         phoneNumber
@@ -35,8 +37,7 @@ class TelegramController {
 
   async code(req, res, next) {
     try {
-      const { refreshToken } = req.cookies;
-      const { apiId, apiHash, phoneNumber, authCode } = req.body;
+      const { apiId, apiHash, authCode } = req.body;
 
       if (authCode === "") {
         return next(ApiError.BadRequest("Ошибка валидации"));
@@ -62,9 +63,10 @@ class TelegramController {
 
   async getAccount(req, res, next) {
     try {
-      const { refreshToken } = req.cookies;
+      const accessToken = tokenService.getAccessTokenFromRequest(req);
+      if (!accessToken) throw ApiError.UnauthorizedError("Вы не авторизованы");
 
-      const userData = TokenService.validateRefreshToken(refreshToken);
+      const userData = tokenService.validateAccessToken(accessToken);
       if (!userData) return ApiError.UnauthorizedError("Вы не авторизованы!");
 
       const response = await TelegramService.getAccount(userData);
