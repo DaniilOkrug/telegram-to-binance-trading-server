@@ -70,7 +70,7 @@ class UserController {
       if (!accessToken) throw ApiError.UnauthorizedError("Вы не авторизованы");
       const userData = tokenService.validateAccessToken(accessToken);
 
-      const refreshToken = await tokenModel.findOne({ user: userData.id });
+      const refreshToken = (await tokenModel.findOne({ user: userData.id })).refreshToken;
 
       const token = await userService.logout(refreshToken);
       res.clearCookie("refreshToken");
