@@ -90,9 +90,7 @@ class BinanceTradingService {
             stopPrice: String(
               await this.filterPrice(signalData.symbol, Number(tpPrice))
             ),
-            quantity: String(
-              Number(mainOrderResponse.origQty) - accumulatedTpVolume
-            ),
+            quantity: await this.filterLotSize(signalData.symbol, Number(mainOrderResponse.origQty) - accumulatedTpVolume),
             positionSide: signalData.positionSide,
           });
           break;
