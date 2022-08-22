@@ -50,8 +50,7 @@ class TelegramConnectionManager {
 
               if (workerInfo.isConnectionRequest) {
                 this.#workers[index].isConnectionRequest = false;
-                resolve(task);
-                worker.terminate();
+                return resolve(task);
               }
 
               if (this.#workers[index].isSendingCode) {
@@ -61,7 +60,9 @@ class TelegramConnectionManager {
               break;
 
             case "TERMINATE":
-              worker.terminate();
+              setTimeout(() => {
+                worker.terminate();
+              }, 1000);
               return;
 
             default:

@@ -23,6 +23,8 @@ class TelegramController {
         });
       }
 
+      console.log('connect response', response);
+
       if (response.type === "ERROR") {
         return next(ApiError.BadRequest(response.message));
       }

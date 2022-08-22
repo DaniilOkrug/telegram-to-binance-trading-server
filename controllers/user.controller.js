@@ -8,7 +8,6 @@ const userService = require("../services/user.service");
 class UserController {
   async refresh(req, res, next) {
     try {
-      console.log(req.headers);
       const accessToken = tokenService.getAccessTokenFromRequest(req);
       if (!accessToken) throw ApiError.UnauthorizedError("Вы не авторизованы");
       const userData = tokenService.validateAccessToken(accessToken);

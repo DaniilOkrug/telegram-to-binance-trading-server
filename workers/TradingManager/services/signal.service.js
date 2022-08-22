@@ -14,9 +14,18 @@ class SignalService {
    * @returns
    */
   determineSignal(message, validationData) {
+    const isClose = this.isSignal(message, validationData.closeWords);
     const isLong = this.isSignal(message, validationData.signalWordsLong);
     const isShort = this.isSignal(message, validationData.signalWordsShort);
     const signalPair = this.determineSignalPair(message, validationData.pairs);
+
+    if (isClose) {
+      return {
+        isSignal: true,
+        isClose: true,
+        symbol: signalPair,
+      };
+    }
 
     if ((isLong || isShort) && signalPair) {
       return {
@@ -33,7 +42,9 @@ class SignalService {
   }
 
   isSignal(message, words) {
-    const wordsArr = Array.isArray(words) ? words : TelegramSettingsMiddleWare.parseSignalWords(words);
+    const wordsArr = Array.isArray(words)
+      ? words
+      : TelegramSettingsMiddleWare.parseSignalWords(words);
 
     for (const word of wordsArr) {
       if (message.includes(word)) {

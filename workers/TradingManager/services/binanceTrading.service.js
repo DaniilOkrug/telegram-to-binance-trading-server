@@ -23,6 +23,8 @@ class BinanceTradingService {
         console.log(log);
       },
     });
+
+    this.openSocket();
   }
 
   openOrder(signalData, binanceSettings) {
@@ -117,17 +119,16 @@ class BinanceTradingService {
       }
 
       //Cтоп-лосс
-      let accumulatedSlVolume = 0;
-      for (let i = 0; i < binanceSettings.sls.length; i++) {
-        const offsetPrice =
-          (Number(price) * Number(binanceSettings.sls[i].offset)) / 100;
-        const slPrice =
-          signalData.positionSide === "LONG"
-            ? Number(price) - offsetPrice
-            : Number(price) + offsetPrice;
 
-        //Для последнего ТП
-        if (i >= binanceSettings.tps.length - 1) {
+      switch (binanceSettings.sl.type) {
+        case "USUAL":
+          const offsetPrice =
+            (Number(price) * Number(binanceSettings.sl.offset)) / 100;
+          const slPrice =
+            signalData.positionSide === "LONG"
+              ? Number(price) - offsetPrice
+              : Number(price) + offsetPrice;
+
           orders.push({
             symbol: signalData.symbol,
             side: signalData.side === "BUY" ? "SELL" : "BUY",
@@ -135,32 +136,46 @@ class BinanceTradingService {
             stopPrice: String(
               await this.filterPrice(signalData.symbol, Number(slPrice))
             ),
-            quantity: String(
-              Number(mainOrderResponse.origQty) - accumulatedSlVolume
-            ),
+            quantity: String(mainOrderResponse.origQty),
             positionSide: signalData.positionSide,
           });
           break;
-        }
 
-        //Для первых ТП исключая последний
-        const slQty =
-          (Number(mainOrderResponse.origQty) * binanceSettings.sls[i].amount) /
-          100;
-        const validSlQty = await this.filterLotSize(signalData.symbol, slQty);
+        case "TRAILING":
+          const slQty =
+            (Number(mainOrderResponse.origQty) * binanceSettings.sl.amount) /
+            100;
+          const validSlQty = await this.filterLotSize(signalData.symbol, slQty);
 
-        accumulatedSlVolume += validSlQty;
+          const trailingOrder = {
+            symbol: signalData.symbol,
+            side: signalData.side === "BUY" ? "SELL" : "BUY",
+            type: "TRAILING_STOP_MARKET",
+            quantity: String(validSlQty),
+            callbackRate: String(binanceSettings.sl.offset),
+            positionSide: signalData.positionSide,
+          };
 
-        orders.push({
-          symbol: signalData.symbol,
-          side: signalData.side === "BUY" ? "SELL" : "BUY",
-          type: "STOP_MARKET",
-          stopPrice: String(
-            await this.filterPrice(signalData.symbol, Number(slPrice))
-          ),
-          quantity: String(validSlQty),
-          positionSide: signalData.positionSide,
-        });
+          // if (binanceSettings.sl.activationPriceOffset !== 0) {
+          //   const offsetPrice =
+          //     (Number(price) *
+          //       Number(binanceSettings.sl.activationPriceOffset)) /
+          //     100;
+          //   const slPrice =
+          //     signalData.positionSide === "LONG"
+          //       ? Number(price) + offsetPrice
+          //       : Number(price) - offsetPrice;
+
+          //   trailingOrder.activationPrice = String(
+          //     await this.filterPrice(signalData.symbol, Number(slPrice))
+          //   );
+          // }
+
+          orders.push(trailingOrder);
+          break;
+
+        default:
+          break;
       }
 
       console.log(orders);
@@ -207,9 +222,24 @@ class BinanceTradingService {
         }
       }
 
+      const tpOrders = ordersResponse.filter(
+        (data) => data.origType === "TAKE_PROFIT_MARKET"
+      );
+      const slOrder = ordersResponse.find(
+        (data) =>
+          data.origType === "TRAILING_STOP_MARKET" ||
+          data.origType === "STOP_MARKET"
+      );
+
       const response = {
+        symbol: signalData.symbol,
+        channelName: signalData.channelName,
         mainOrder: mainOrderResponse,
-        subOrders: ordersResponse,
+        subOrders: {
+          tps: tpOrders,
+          sl: slOrder,
+        },
+        binanceSettings,
       };
 
       this.#orders.push(response);
@@ -226,7 +256,7 @@ class BinanceTradingService {
 
   getPairsData() {
     return new Promise(async (resolve, reject) => {
-      resolve(await this.#binance.futuresExchangeInfo())
+      resolve(await this.#binance.futuresExchangeInfo());
     });
   }
 
@@ -246,32 +276,165 @@ class BinanceTradingService {
     });
   }
 
-  //   openSocket() {
-  //     this.#binance.websockets.userFutureData(
-  //       console.log(),
-  //       console.log(),
-  //       async (updateInfo) => {
-  //         const orderUpdate = updateInfo.order;
+  openSocket() {
+    this.#binance.websockets.userFutureData(
+      console.log(),
+      console.log(),
+      async (updateInfo) => {
+        const orderUpdate = updateInfo.order;
+        console.log(orderUpdate);
 
-  //         const orderData = orders.find(data => data.mainOrder.orderId == orderUpdate.orderId);
+        const ordersData = this.#orders.find(
+          (data) => data.symbol == orderUpdate.symbol
+        );
+        const ordersDataIndex = this.#orders.indexOf(ordersData);
 
-  //         if (!orderData) return;
+        if (!ordersData) return;
 
-  //         if (orderUpdate.orderStatus === 'FILLED' && orderData.origQty == orderUpdate.originalQuantity) {
+        if (orderUpdate.orderStatus === "FILLED") {
+          console.log("Order FILLED");
 
-  //         }
-  //       }
-  //     );
-  //   }
+          //Заполнен побочный ордер
+          const isTpOrder = ordersData.subOrders.tps.find(
+            (data) => data.orderId === orderUpdate.orderId
+          );
+          const isSlOrder =
+            ordersData.subOrders.sl.orderId === orderUpdate.orderId;
+
+          console.log(isTpOrder, isSlOrder);
+
+          //Заполнен побочный ордер
+          if (isTpOrder || isSlOrder) {
+            const newPositionSize =
+              Number(ordersData.mainOrder.origQty) -
+              Number(orderUpdate.originalQuantity);
+
+            this.#orders[ordersDataIndex].mainOrder.origQty = newPositionSize;
+          }
+
+          //Тейк-профит
+          if (isTpOrder) {
+            //Закрыть стоплоссы
+            const cancelStoplossResponse = await this.#binance.futuresCancel(
+              ordersData.symbol,
+              {
+                orderId: ordersData.subOrders.sl.orderId,
+              }
+            );
+
+            //Позиция полностью закрылась
+            if (ordersData.mainOrder.origQty === 0) {
+              console.log("Position closed by TP");
+              this.#orders.splice(ordersDataIndex, 1);
+              return;
+            }
+
+            //Выставляем новый стоплосс
+            const newSLOrder = [
+              {
+                symbol: ordersData.subOrders.sl.symbol,
+                side: ordersData.subOrders.sl.side,
+                type: ordersData.subOrders.sl.origType,
+                quantity: String(
+                  this.#orders[ordersDataIndex].mainOrder.origQty
+                ),
+                positionSide: ordersData.subOrders.sl.positionSide,
+              },
+            ];
+
+            switch (newSLOrder[0].type) {
+              case "STOP_MARKET":
+                newSLOrder[0].stopPrice = ordersData.subOrders.sl.stopPrice;
+                break;
+
+              case "TRAILING_STOP_MARKET":
+                newSLOrder[0].callbackRate = ordersData.subOrders.sl.priceRate;
+                break;
+            }
+
+            const binanceResponse = (
+              await this.#binance.futuresMultipleOrders(newSLOrder)
+            )[0];
+
+            console.log("new sl", binanceResponse);
+
+            this.#orders[ordersDataIndex].subOrders.sl = binanceResponse;
+
+            return;
+          }
+
+          if (isSlOrder) {
+            //Отменяем тейкпрофиты
+            for (const tpOrder of ordersData.subOrders.tps) {
+              const cancelTakeprofitResponse =
+                await this.#binance.futuresCancel(ordersData.symbol, {
+                  orderId: tpOrder.orderId,
+                });
+            }
+
+            //Позиция полностью закрылась
+            this.#orders.splice(ordersDataIndex, 1);
+            return;
+          }
+        }
+      }
+    );
+  }
+
+  async closePosition(signalData) {
+    const ordersData = this.#orders.find(
+      (data) =>
+        data.symbol === signalData.symbol &&
+        data.channelName === signalData.channelName
+    );
+
+    if (!ordersData) return;
+
+    //Закрытие позиции
+    const mainCloseResponse = (
+      await this.#binance.futuresMultipleOrders([
+        {
+          symbol: signalData.symbol,
+          side: ordersData.mainOrder.side === "BUY" ? "SELL" : "BUY",
+          type: "MARKET",
+          quantity: ordersData.mainOrder.origQty,
+          positionSide: ordersData.mainOrder.positionSide,
+        },
+      ])
+    )[0];
+
+    //Отменяем стоплосс
+    const cancelStoplossResponse = await this.#binance.futuresCancel(
+      signalData.symbol,
+      {
+        orderId: ordersData.subOrders.sl.orderId,
+      }
+    );
+
+    //Отменяем тейкпрофиты
+    for (const tpData of ordersData.subOrders.tps) {
+      const cancelResponse = await this.#binance.futuresCancel(
+        signalData.symbol,
+        {
+          orderId: tpData.orderId,
+        }
+      );
+    }
+
+    const indexOfOrdersData = this.#orders.indexOf(ordersData);
+    this.#orders.splice(indexOfOrdersData, 1);
+
+    return mainCloseResponse;
+  }
 
   filterLotSize(symbol, volume) {
     return new Promise((resolve, reject) => {
       try {
         const pairInfo = this.pairsData.find((data) => data.symbol === symbol);
 
-        console.log(this.pairsData.map(data => data.symbol));
+        console.log(this.pairsData.map((data) => data.symbol));
 
-        if(!pairInfo) return resolve(volume);
+        if (!pairInfo) return resolve(volume);
 
         const volumeFilter = pairInfo.filters.find(
           (filter) => filter.filterType === "LOT_SIZE"

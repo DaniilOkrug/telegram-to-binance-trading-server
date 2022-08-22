@@ -23,7 +23,6 @@ class BinanceController {
       const response = await BinanceService.connect(accessToken, key, secret);
 
       if (response.type === "ERROR") {
-        console.log(response.message);
         return next(ApiError.BadRequest(response.message));
       }
 

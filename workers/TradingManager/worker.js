@@ -74,7 +74,7 @@ let pairs = [];
         );
 
         if (
-          event.message.peerId.channelId.value ===
+          event.message.peerId.channelId?.value ===
           channel.inputEntity.channelId.value
         ) {
           const messageText = event.message.message;
@@ -86,12 +86,22 @@ let pairs = [];
             signalWordsLong: INITIAL_SETTINGS.telegramSettings.signalWordsLong,
             signalWordsShort:
               INITIAL_SETTINGS.telegramSettings.signalWordsShort,
+            closeWords: INITIAL_SETTINGS.telegramSettings.closeWords,
           });
+
+          signalData.channelName = channelSettings.telegramSettings.channelName;
 
           console.log(signalData);
 
           if (signalData.isSignal) {
-            const reponse = await BinanceTrading.openOrder(signalData, channelSettings.binanceSettings);
+            if (signalData.isClose) {
+              const response = await  BinanceTrading.closePosition(signalData);
+            } else {
+              const response = await BinanceTrading.openOrder(
+                signalData,
+                channelSettings.binanceSettings
+              );
+            }
           }
         }
       }
@@ -101,14 +111,17 @@ let pairs = [];
       type: "CONNECTED",
     });
   } catch (error) {
-    console.log(error);
-    parentPort.postMessage({
-      type: "CONNECTION_ERROR",
-      message: "Ошибка подключения к Telegram аккаунту",
-    });
+    console.error(error);
 
-    parentPort.postMessage({ type: "TERMINATE" });
-    parentPort.close();
+    setTimeout(() => {
+      parentPort.postMessage({
+        type: "CONNECTION_ERROR",
+        message: "Ошибка подключения к Telegram аккаунту",
+      });
+
+      parentPort.postMessage({ type: "TERMINATE" });
+      parentPort.close();
+    }, 1000);
   }
 })();
 

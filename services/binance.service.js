@@ -15,13 +15,27 @@ class BinanceService {
 
     try {
       const response = await binance.futuresMarketBuy("ETHUSDT", 1);
+      console.log(response);
 
       if (response.code) {
-        if (response.code == -2014) {
-          return resolve({
-            type: "ERROR",
-            message: "API ключи неверные",
-          });
+        switch (response.code) {
+          case -2014:
+            return {
+              type: "ERROR",
+              message: "API ключи неверные",
+            };
+
+          case -2015:
+            return {
+              type: "ERROR",
+              message: "Ключи не имеют нужных разрешений",
+            };
+
+          default:
+            return {
+              type: "ERROR",
+              message: "Ошибка подключения ключей",
+            };
         }
       }
 

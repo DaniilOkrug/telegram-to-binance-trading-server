@@ -6,8 +6,10 @@ const TakeProfitShema = new Schema({
 });
 
 const StopLossShema = new Schema({
+  type: { type: String, required: true },
   offset: { type: String, required: true }, //Percent
   amount: { type: Number, required: true },
+  activationPriceOffset: { type: Number, required: false },
 });
 
 const TelegramTradingChannelsShema = new Schema({
@@ -18,13 +20,14 @@ const TelegramTradingChannelsShema = new Schema({
     channelName: { type: String, required: true },
     signalWordsLong: { type: String, required: true },
     signalWordsShort: { type: String, required: true },
+    closeWords: { type: String, required: true },
   },
 
   binanceSettings: {
     leverage: { type: Number, required: true },
     positionSize: { type: Number, required: true }, //in dollars
     tps: { type: [TakeProfitShema], required: true },
-    sls: { type: [StopLossShema], required: true },
+    sl: { type: StopLossShema, required: true },
   },
 });
 

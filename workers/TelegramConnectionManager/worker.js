@@ -52,7 +52,6 @@ parentPort.on("message", async (code) => {
         return authCode;
       },
       onError: async (err) => {
-        console.log(Object.keys.err);
         console.log(err);
 
         switch (err.code) {
@@ -63,12 +62,22 @@ parentPort.on("message", async (code) => {
             });
             break;
 
+          case 400:
+            parentPort.postMessage({
+              type: "ERROR",
+              message: "Неверный API Id",
+            });
+            break;
+
           default:
             parentPort.postMessage({
               type: "ERROR",
               message: "Ошибка подключения",
             });
         }
+
+        parentPort.postMessage({ type: "TERMINATE" });
+        parentPort.close();
       },
     });
 
