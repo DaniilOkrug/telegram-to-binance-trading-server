@@ -15,30 +15,30 @@ class BinanceService {
     });
 
     try {
-      const response = await binance.futuresMarketBuy("ETHUSDT", 1);
-      console.log(response);
+      // const response = await binance.futuresMarketBuy("ETHUSDT", 1);
+      // console.log(response);
 
-      if (response.code) {
-        switch (response.code) {
-          case -2014:
-            return {
-              type: "ERROR",
-              message: "API ключи неверные",
-            };
+      // if (response.code) {
+      //   switch (response.code) {
+      //     case -2014:
+      //       return {
+      //         type: "ERROR",
+      //         message: "API ключи неверные",
+      //       };
 
-          case -2015:
-            return {
-              type: "ERROR",
-              message: "Ключи не имеют нужных разрешений",
-            };
+      //     case -2015:
+      //       return {
+      //         type: "ERROR",
+      //         message: "Ключи не имеют нужных разрешений",
+      //       };
 
-          default:
-            return {
-              type: "ERROR",
-              message: "Ошибка подключения ключей",
-            };
-        }
-      }
+      //     default:
+      //       return {
+      //         type: "ERROR",
+      //         message: "Ошибка подключения ключей",
+      //       };
+      //   }
+      // }
 
       const userData = TokenService.validateAccessToken(accessToken);
       const binanceAccountData = await BinanceAccountModel.findOne({
