@@ -5,6 +5,7 @@ const binanceAccountModel = require("../models/binanceAccount.model");
 
 class BinanceService {
   async connect(accessToken, key, secret) {
+    console.log(key, secret);
     const binance = new Binance().options({
       APIKEY: key,
       APISECRET: secret,
