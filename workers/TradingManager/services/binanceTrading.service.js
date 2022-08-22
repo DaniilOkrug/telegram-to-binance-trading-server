@@ -308,8 +308,11 @@ class BinanceTradingService {
 
           //Заполнен побочный ордер
           if (isTpOrder || isSlOrder) {
-            const newPositionSize = await this.filterLotSize(ordersData.mainOrder.symbol, Number(ordersData.mainOrder.origQty) -
-            Number(orderUpdate.originalQuantity));
+            const newPositionSize = await this.filterLotSize(
+              ordersData.mainOrder.symbol,
+              Number(ordersData.mainOrder.origQty) -
+                Number(orderUpdate.originalQuantity)
+            );
 
             this.#orders[ordersDataIndex].mainOrder.origQty = newPositionSize;
           }
@@ -429,7 +432,7 @@ class BinanceTradingService {
     return mainCloseResponse;
   }
 
-  filterLotSize(symbol, volume) {
+  filterLotSize(symbol, volume, checkMaxMin = false) {
     return new Promise((resolve, reject) => {
       try {
         const pairInfo = this.pairsData.find((data) => data.symbol === symbol);
@@ -442,18 +445,14 @@ class BinanceTradingService {
           (filter) => filter.filterType === "LOT_SIZE"
         );
 
-        if (volume < volumeFilter.minQty) {
-          reject(
-            new Error(`[${symbol}] Lot less than Binance require!`)
-          );
-        }
+        if (checkMaxMin) {
+          if (volume < volumeFilter.minQty) {
+            reject(new Error(`[${symbol}] Lot less than Binance require!`));
+          }
 
-        if (volume > volumeFilter.maxQty) {
-          reject(
-            new Error(
-              `[${symbol}] Lot greater than Binance require!`
-            )
-          );
+          if (volume > volumeFilter.maxQty) {
+            reject(new Error(`[${symbol}] Lot greater than Binance require!`));
+          }
         }
 
         const volumeStepSizeRemainder =
