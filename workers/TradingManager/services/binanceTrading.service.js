@@ -308,9 +308,8 @@ class BinanceTradingService {
 
           //Заполнен побочный ордер
           if (isTpOrder || isSlOrder) {
-            const newPositionSize =
-              Number(ordersData.mainOrder.origQty) -
-              Number(orderUpdate.originalQuantity);
+            const newPositionSize = await this.filterLotSize(ordersData.mainOrder.symbol, Number(ordersData.mainOrder.origQty) -
+            Number(orderUpdate.originalQuantity));
 
             this.#orders[ordersDataIndex].mainOrder.origQty = newPositionSize;
           }
