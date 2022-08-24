@@ -12,6 +12,8 @@ class UserController {
       if (!accessToken) throw ApiError.UnauthorizedError("Вы не авторизованы");
       const userData = tokenService.validateAccessToken(accessToken);
 
+      if (!userData) throw ApiError.UnauthorizedError('Вы не авторизованы');
+
       const refreshToken = (await tokenModel.findOne({ user: userData.id })).refreshToken;
 
       const tokenData = await userService.refresh(refreshToken);
@@ -42,7 +44,7 @@ class UserController {
       });
 
       return res.json(userData);
-    } catch (e) {
+    } catch (e) { 
       next(e);
     }
   }

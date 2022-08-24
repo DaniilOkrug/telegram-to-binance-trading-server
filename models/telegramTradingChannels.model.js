@@ -3,6 +3,7 @@ const { Schema, model } = require("mongoose");
 const TakeProfitShema = new Schema({
   offset: { type: String, required: true }, //Percent
   amount: { type: Number, required: true },
+  breakeven: { type: Boolean, required: true },
 });
 
 const StopLossShema = new Schema({

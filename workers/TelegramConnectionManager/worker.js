@@ -83,11 +83,12 @@ parentPort.on("message", async (code) => {
 
     const telegramAuthToken = client.session.save();
 
+    console.log(telegramAuthToken);
+
     const userData = tokenService.validateAccessToken(workerData.accessToken);
 
     const telegramDataCondition = {
       user: userData.id,
-      apiId: workerData.apiId,
     };
     const telegramData = await TelegramAccountModel.findOne(
       telegramDataCondition

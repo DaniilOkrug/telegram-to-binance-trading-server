@@ -53,11 +53,16 @@ class BinanceTradingService {
 
       console.log(mainOrder);
 
-      const mainOrderResponse = (
-        await this.#binance.futuresMultipleOrders(mainOrder)
-      )[0];
+      const mainOrderResp = await this.#binance.futuresMultipleOrders(
+        mainOrder
+      );
+      const mainOrderResponse = mainOrderResp[0];
 
-      console.log(mainOrderResponse);
+      mainOrderResponse.price = String(
+        await this.filterPrice(signalData.symbol, Number(price))
+      );
+
+      console.log(mainOrderResp);
 
       if (!mainOrderResponse.orderId) {
         console.log(mainOrderResponse);
@@ -73,6 +78,7 @@ class BinanceTradingService {
 
       //Тейк-профит
       let accumulatedTpVolume = 0;
+      let slPriceOfBreakevenTp;
       for (let i = 0; i < binanceSettings.tps.length; i++) {
         const offsetPrice =
           (Number(price) * Number(binanceSettings.tps[i].offset)) / 100;
@@ -83,7 +89,7 @@ class BinanceTradingService {
 
         //Для последнего ТП
         if (i >= binanceSettings.tps.length - 1) {
-          orders.push({
+          const order = {
             symbol: signalData.symbol,
             side: signalData.side === "BUY" ? "SELL" : "BUY",
             type: "TAKE_PROFIT_MARKET",
@@ -97,7 +103,14 @@ class BinanceTradingService {
               )
             ),
             positionSide: signalData.positionSide,
-          });
+          };
+
+          //Определяем перенос БУ
+          if (binanceSettings.tps[i].breakeven) {
+            slPriceOfBreakevenTp = order.stopPrice;
+          }
+
+          orders.push(order);
           break;
         }
 
@@ -109,7 +122,7 @@ class BinanceTradingService {
 
         accumulatedTpVolume += validTpQty;
 
-        orders.push({
+        const order = {
           symbol: signalData.symbol,
           side: signalData.side === "BUY" ? "SELL" : "BUY",
           type: "TAKE_PROFIT_MARKET",
@@ -118,11 +131,17 @@ class BinanceTradingService {
           ),
           quantity: String(validTpQty),
           positionSide: signalData.positionSide,
-        });
+        };
+
+        //Определяем перенос БУ
+        if (binanceSettings.tps[i].breakeven) {
+          slPriceOfBreakevenTp = order.stopPrice;
+        }
+
+        orders.push(order);
       }
 
       //Cтоп-лосс
-
       switch (binanceSettings.sl.type) {
         case "USUAL":
           const offsetPrice =
@@ -159,21 +178,6 @@ class BinanceTradingService {
             positionSide: signalData.positionSide,
           };
 
-          // if (binanceSettings.sl.activationPriceOffset !== 0) {
-          //   const offsetPrice =
-          //     (Number(price) *
-          //       Number(binanceSettings.sl.activationPriceOffset)) /
-          //     100;
-          //   const slPrice =
-          //     signalData.positionSide === "LONG"
-          //       ? Number(price) + offsetPrice
-          //       : Number(price) - offsetPrice;
-
-          //   trailingOrder.activationPrice = String(
-          //     await this.filterPrice(signalData.symbol, Number(slPrice))
-          //   );
-          // }
-
           orders.push(trailingOrder);
           break;
 
@@ -183,7 +187,16 @@ class BinanceTradingService {
 
       console.log(orders);
 
-      const ordersResponse = await this.#binance.futuresMultipleOrders(orders);
+      const ordersResponse = await this.placeMultipleOrders(orders);
+
+      //Добавляем БУ свойство в ответ для индентификации в будущем переноса стоп-лосса
+      if (slPriceOfBreakevenTp) {
+        for (let i = 0; i < ordersResponse.length; i++) {
+          if (ordersResponse[i].stopPrice == slPriceOfBreakevenTp) {
+            ordersResponse[i].breakeven = true;
+          }
+        }
+      }
 
       console.log(ordersResponse);
 
@@ -319,6 +332,8 @@ class BinanceTradingService {
 
           //Тейк-профит
           if (isTpOrder) {
+            console.log('Это ТП');
+
             //Закрыть стоплоссы
             const cancelStoplossResponse = await this.#binance.futuresCancel(
               ordersData.symbol,
@@ -349,7 +364,13 @@ class BinanceTradingService {
 
             switch (newSLOrder[0].type) {
               case "STOP_MARKET":
-                newSLOrder[0].stopPrice = ordersData.subOrders.sl.stopPrice;
+                if (isTpOrder.breakeven) {
+                  newSLOrder[0].stopPrice = ordersData.mainOrder.price;
+                  ordersData.subOrders.sl.stopPrice =
+                    ordersData.mainOrder.price;
+                } else {
+                  newSLOrder[0].stopPrice = ordersData.subOrders.sl.stopPrice;
+                }
                 break;
 
               case "TRAILING_STOP_MARKET":
@@ -369,6 +390,8 @@ class BinanceTradingService {
           }
 
           if (isSlOrder) {
+            console.log('Это СЛ');
+
             //Отменяем тейкпрофиты
             for (const tpOrder of ordersData.subOrders.tps) {
               const cancelTakeprofitResponse =
@@ -384,6 +407,49 @@ class BinanceTradingService {
         }
       }
     );
+  }
+
+  /**
+   * Делит массив ордеров на части по 5 и отправляет на Binance.
+   *
+   * Binance имеет ограничение на 5 одновременно размещаемых ордеров.
+   *
+   * @param {[any]} ordersArr
+   * @returns Binance respones
+   */
+  placeMultipleOrders(ordersArr) {
+    return new Promise(async (resolve, reject) => {
+      try {
+        let responses = [];
+        let arraysOfOrders = [];
+
+        if (ordersArr.length > 5) {
+          for (let i = 0; i < ordersArr.length; i += 5) {
+            const chunk = ordersArr.slice(i, i + 5);
+            arraysOfOrders.push(chunk);
+          }
+        } else {
+          arraysOfOrders.push(ordersArr);
+        }
+
+        for (const orders of arraysOfOrders) {
+          const binanceResponses = await this.#binance.futuresMultipleOrders(
+            orders
+          );
+          responses = responses.concat(binanceResponses);
+        }
+
+        resolve(responses);
+      } catch (error) {
+        console.log(error);
+        resolve([
+          {
+            type: "ERROR",
+            message: "Ошибка открытия ордеров",
+          },
+        ]);
+      }
+    });
   }
 
   async closePosition(signalData) {
