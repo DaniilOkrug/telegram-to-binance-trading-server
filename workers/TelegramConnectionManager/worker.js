@@ -2,12 +2,12 @@ require("dotenv").config();
 const { parentPort, workerData } = require("worker_threads");
 const mongoose = require("mongoose");
 
-const { TelegramClient, Api } = require("telegram");
+const { TelegramClient } = require("telegram");
 const { StringSession } = require("telegram/sessions");
-const { NewMessage } = require("telegram/events");
 
 const TelegramAccountModel = require("../../models/telegramAccount.model");
 const tokenService = require("../../services/token.service");
+const TradingHistoryModel = require("../../models/tradeHistory.model");
 
 console.log("Telegram Connection Worker started");
 

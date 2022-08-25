@@ -1,4 +1,5 @@
 const { parentPort, workerData } = require("worker_threads");
+const mongoose = require("mongoose");
 
 const { TelegramClient } = require("telegram");
 const { NewMessage } = require("telegram/events");
@@ -30,6 +31,12 @@ let pairs = [];
 
 (async () => {
   try {
+    //Connect Database
+    mongoose.connect(process.env.DB_URL, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+    });
+
     //Тестируем Binance аккаунт
     const response = await BinanceTrading.testConnection();
 
@@ -95,11 +102,12 @@ let pairs = [];
 
           if (signalData.isSignal) {
             if (signalData.isClose) {
-              const response = await  BinanceTrading.closePosition(signalData);
+              const response = await BinanceTrading.closePosition(signalData);
             } else {
               const response = await BinanceTrading.openOrder(
                 signalData,
-                channelSettings.binanceSettings
+                channelSettings.binanceSettings,
+                INITIAL_SETTINGS.userId
               );
             }
           }

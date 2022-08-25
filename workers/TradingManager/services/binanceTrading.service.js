@@ -1,9 +1,11 @@
 const Binance = require("node-binance-api");
+const TradingHistoryModel = require("../../../models/tradeHistory.model");
 
 class BinanceTradingService {
   #options;
   #binance;
   #orders = [];
+  #closingOrders = [];
   pairsData = [];
   precisions = {};
 
@@ -27,7 +29,7 @@ class BinanceTradingService {
     this.openSocket();
   }
 
-  openOrder(signalData, binanceSettings) {
+  openOrder(signalData, binanceSettings, userId) {
     return new Promise(async (resolve, reject) => {
       //Задаем плечо
       await this.#binance.futuresLeverage(
@@ -255,6 +257,14 @@ class BinanceTradingService {
           tps: tpOrders,
           sl: slOrder,
         },
+        statistics: {
+          user: userId,
+          openPrice: mainOrderResponse.price,
+          side: mainOrderResponse.positionSide,
+          pair: mainOrderResponse.symbol,
+          profit: 0,
+          commission: 0,
+        },
         binanceSettings,
       };
 
@@ -317,7 +327,50 @@ class BinanceTradingService {
           const isSlOrder =
             ordersData.subOrders.sl.orderId === orderUpdate.orderId;
 
-          console.log(isTpOrder, isSlOrder);
+          const isClosingOrder = this.#closingOrders.find(
+            (data) => data.orderId === orderUpdate.orderId
+          );
+
+          console.log(isTpOrder, isSlOrder, isClosingOrder);
+
+          //Закрытие позиции
+          if (isClosingOrder) {
+            const closingOrderIndex =
+              this.#closingOrders.indexOf(isClosingOrder);
+
+            const closingOrdersData = this.#orders.find(
+              (data) =>
+                data.symbol === isClosingOrder.symbol &&
+                data.channelName === isClosingOrder.channelName
+            );
+
+            const closingOrdersDataIndex =
+              this.#orders.indexOf(closingOrdersData);
+
+            //Обновляем статистику
+            this.#orders[closingOrdersDataIndex].statistics.profit += Number(
+              orderUpdate.realizedProfit
+            );
+
+            if (typeof orderUpdate.commission !== 'undefined') {
+              this.#orders[closingOrdersDataIndex].statistics.commission += Number(
+                orderUpdate.commission
+              );
+            }
+
+            const model = {
+              ...this.#orders[closingOrdersDataIndex].statistics,
+              channelName: this.#orders[closingOrdersDataIndex].channelName,
+              timestamp: Date.now(),
+            };
+            console.log(model);
+
+            await TradingHistoryModel.create(model);
+
+            this.#orders.splice(closingOrdersDataIndex, 1);
+            this.#closingOrders.splice(closingOrderIndex, 1);
+            return;
+          }
 
           //Заполнен побочный ордер
           if (isTpOrder || isSlOrder) {
@@ -332,7 +385,18 @@ class BinanceTradingService {
 
           //Тейк-профит
           if (isTpOrder) {
-            console.log('Это ТП');
+            console.log("Это ТП");
+
+            //Обновляем статистику
+            this.#orders[ordersDataIndex].statistics.profit += Number(
+              orderUpdate.realizedProfit
+            );
+
+            if (orderUpdate.commission) {
+              this.#orders[ordersDataIndex].statistics.commission += Number(
+                orderUpdate.commission
+              );
+            }
 
             //Закрыть стоплоссы
             const cancelStoplossResponse = await this.#binance.futuresCancel(
@@ -345,6 +409,13 @@ class BinanceTradingService {
             //Позиция полностью закрылась
             if (ordersData.mainOrder.origQty === 0) {
               console.log("Position closed by TP");
+
+              await TradingHistoryModel.create({
+                ...this.#orders[ordersDataIndex].statistics,
+                channelName: this.#orders[ordersDataIndex].channelName,
+                timestamp: Date.now(),
+              });
+
               this.#orders.splice(ordersDataIndex, 1);
               return;
             }
@@ -390,7 +461,18 @@ class BinanceTradingService {
           }
 
           if (isSlOrder) {
-            console.log('Это СЛ');
+            console.log("Это СЛ");
+
+            //Обновляем статистику
+            this.#orders[ordersDataIndex].statistics.profit += Number(
+              orderUpdate.realizedProfit
+            );
+
+            if (orderUpdate.commission) {
+              this.#orders[ordersDataIndex].statistics.commission += Number(
+                orderUpdate.commission
+              );
+            }
 
             //Отменяем тейкпрофиты
             for (const tpOrder of ordersData.subOrders.tps) {
@@ -401,6 +483,12 @@ class BinanceTradingService {
             }
 
             //Позиция полностью закрылась
+            await TradingHistoryModel.create({
+              ...this.#orders[ordersDataIndex].statistics,
+              channelName: this.#orders[ordersDataIndex].channelName,
+              timestamp: Date.now(),
+            });
+
             this.#orders.splice(ordersDataIndex, 1);
             return;
           }
@@ -474,6 +562,12 @@ class BinanceTradingService {
       ])
     )[0];
 
+    mainCloseResponse.channelName = signalData.channelName;
+
+    this.#closingOrders.push(mainCloseResponse);
+
+    console.log("Закрытие позиции", mainCloseResponse);
+
     //Отменяем стоплосс
     const cancelStoplossResponse = await this.#binance.futuresCancel(
       signalData.symbol,
@@ -492,8 +586,8 @@ class BinanceTradingService {
       );
     }
 
-    const indexOfOrdersData = this.#orders.indexOf(ordersData);
-    this.#orders.splice(indexOfOrdersData, 1);
+    // const indexOfOrdersData = this.#orders.indexOf(ordersData);
+    // this.#orders.splice(indexOfOrdersData, 1);
 
     return mainCloseResponse;
   }

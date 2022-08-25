@@ -58,10 +58,12 @@ class SignalService {
   determineSignalPair(message, pairs) {
     for (const pair of pairs) {
       const USDT_index = pair.indexOf("USDT");
-      const alternativePairFormat =
-        pair.slice(0, USDT_index) + "/" + pair.slice(USDT_index);
+      const coin = pair.slice(0, USDT_index);
+      const usdt = pair.slice(USDT_index);
 
-      if (message.includes(pair) || message.includes(alternativePairFormat)) {
+      const alternativePairFormat = coin + "/" + usdt;
+
+      if (message.includes(pair) || message.includes(alternativePairFormat) || message.includes(coin)) {
         return pair;
       }
     }
