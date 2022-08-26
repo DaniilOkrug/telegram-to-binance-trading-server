@@ -16,6 +16,19 @@ class TradingController {
     }
   }
 
+  async getTradingHistory(req, res, next) {
+    try {
+      const accessToken = tokenService.getAccessTokenFromRequest(req);
+      if (!accessToken) throw ApiError.UnauthorizedError("Вы не авторизованы");
+
+      const response = await TradingService.getTradingHistory(accessToken);
+
+      return res.json(response);
+    } catch (e) {
+      next(e);
+    }
+  }
+
   async getAccountStatus(req, res, next) {
     try {
       const accessToken = tokenService.getAccessTokenFromRequest(req);

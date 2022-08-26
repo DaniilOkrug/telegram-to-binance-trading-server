@@ -6,6 +6,7 @@ const TradingController = require('../controllers/trading.controller');
 const tradingRouter = new Router();
 
 tradingRouter.get('/getChannels', authMiddleware, TradingController.getChannels);
+tradingRouter.get('/getTradingHistory', authMiddleware, TradingController.getTradingHistory);
 tradingRouter.get('/getAccountStatus', authMiddleware, TradingController.getAccountStatus);
 tradingRouter.post('/addChannel', authMiddleware, TradingController.addChannel);
 tradingRouter.post('/deleteChannel', authMiddleware, TradingController.deleteChannel);

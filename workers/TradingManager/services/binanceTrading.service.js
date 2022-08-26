@@ -1,4 +1,5 @@
 const Binance = require("node-binance-api");
+const { toSignedLittleBuffer } = require("telegram/Helpers");
 const TradingHistoryModel = require("../../../models/tradeHistory.model");
 
 class BinanceTradingService {
@@ -6,6 +7,8 @@ class BinanceTradingService {
   #binance;
   #orders = [];
   #closingOrders = [];
+  #tasksQueue = [];
+  #taskProcessingStatus = 0; // 0 - waiting task / 1 - processing task
   pairsData = [];
   precisions = {};
 
@@ -307,182 +310,131 @@ class BinanceTradingService {
       console.log(),
       console.log(),
       async (updateInfo) => {
-        const orderUpdate = updateInfo.order;
-        console.log(orderUpdate);
+        this.#tasksQueue.push(updateInfo);
 
-        const ordersData = this.#orders.find(
-          (data) => data.symbol == orderUpdate.symbol
+        if (this.#taskProcessingStatus === 0) {
+          this.#taskProcessingStatus = 1;
+
+          while (true) {
+            const task = this.#tasksQueue.shift();
+            console.log("task processing");
+            await this.prcessTaskOrder(task);
+
+            if (this.#tasksQueue.length === 0) {
+              this.#taskProcessingStatus = 0;
+              break;
+            }
+          }
+
+          console.log('exit', this.#taskProcessingStatus);
+        }
+      }
+    );
+  }
+
+  prcessTaskOrder(updateInfo) {
+    return new Promise(async (resolve, reject) => {
+      const orderUpdate = updateInfo.order;
+      console.log(orderUpdate);
+
+      const ordersData = this.#orders.find(
+        (data) => data.symbol == orderUpdate.symbol
+      );
+      const ordersDataIndex = this.#orders.indexOf(ordersData);
+
+      if (!ordersData) return resolve();
+
+      if (orderUpdate.orderStatus === "FILLED") {
+        console.log("Order FILLED");
+
+        //Заполнен побочный ордер
+        const isTpOrder = ordersData.subOrders.tps.find(
+          (data) => data.orderId === orderUpdate.orderId
         );
-        const ordersDataIndex = this.#orders.indexOf(ordersData);
+        const isSlOrder =
+          ordersData.subOrders.sl.orderId === orderUpdate.orderId;
 
-        if (!ordersData) return;
+        const isClosingOrder = this.#closingOrders.find(
+          (data) => data.orderId === orderUpdate.orderId
+        );
 
-        if (orderUpdate.orderStatus === "FILLED") {
-          console.log("Order FILLED");
+        console.log(isTpOrder, isSlOrder, isClosingOrder);
 
-          //Заполнен побочный ордер
-          const isTpOrder = ordersData.subOrders.tps.find(
-            (data) => data.orderId === orderUpdate.orderId
+        //Закрытие позиции
+        if (isClosingOrder) {
+          const closingOrderIndex = this.#closingOrders.indexOf(isClosingOrder);
+
+          const closingOrdersData = this.#orders.find(
+            (data) =>
+              data.symbol === isClosingOrder.symbol &&
+              data.channelName === isClosingOrder.channelName
           );
-          const isSlOrder =
-            ordersData.subOrders.sl.orderId === orderUpdate.orderId;
 
-          const isClosingOrder = this.#closingOrders.find(
-            (data) => data.orderId === orderUpdate.orderId
+          const closingOrdersDataIndex =
+            this.#orders.indexOf(closingOrdersData);
+
+          //Обновляем статистику
+          this.#orders[closingOrdersDataIndex].statistics.profit += Number(
+            orderUpdate.realizedProfit
           );
 
-          console.log(isTpOrder, isSlOrder, isClosingOrder);
-
-          //Закрытие позиции
-          if (isClosingOrder) {
-            const closingOrderIndex =
-              this.#closingOrders.indexOf(isClosingOrder);
-
-            const closingOrdersData = this.#orders.find(
-              (data) =>
-                data.symbol === isClosingOrder.symbol &&
-                data.channelName === isClosingOrder.channelName
-            );
-
-            const closingOrdersDataIndex =
-              this.#orders.indexOf(closingOrdersData);
-
-            //Обновляем статистику
-            this.#orders[closingOrdersDataIndex].statistics.profit += Number(
-              orderUpdate.realizedProfit
-            );
-
-            if (typeof orderUpdate.commission !== 'undefined') {
-              this.#orders[closingOrdersDataIndex].statistics.commission += Number(
-                orderUpdate.commission
-              );
-            }
-
-            const model = {
-              ...this.#orders[closingOrdersDataIndex].statistics,
-              channelName: this.#orders[closingOrdersDataIndex].channelName,
-              timestamp: Date.now(),
-            };
-            console.log(model);
-
-            await TradingHistoryModel.create(model);
-
-            this.#orders.splice(closingOrdersDataIndex, 1);
-            this.#closingOrders.splice(closingOrderIndex, 1);
-            return;
+          if (typeof orderUpdate.commission !== "undefined") {
+            this.#orders[closingOrdersDataIndex].statistics.commission +=
+              Number(orderUpdate.commission);
           }
 
-          //Заполнен побочный ордер
-          if (isTpOrder || isSlOrder) {
-            const newPositionSize = await this.filterLotSize(
-              ordersData.mainOrder.symbol,
-              Number(ordersData.mainOrder.origQty) -
-                Number(orderUpdate.originalQuantity)
-            );
+          const model = {
+            ...this.#orders[closingOrdersDataIndex].statistics,
+            channelName: this.#orders[closingOrdersDataIndex].channelName,
+            timestamp: Date.now(),
+          };
+          console.log(model);
 
-            this.#orders[ordersDataIndex].mainOrder.origQty = newPositionSize;
+          await TradingHistoryModel.create(model);
+
+          this.#orders.splice(closingOrdersDataIndex, 1);
+          this.#closingOrders.splice(closingOrderIndex, 1);
+          return resolve();
+        }
+
+        //Заполнен побочный ордер
+        if (isTpOrder || isSlOrder) {
+          const newPositionSize = await this.filterLotSize(
+            ordersData.mainOrder.symbol,
+            Number(ordersData.mainOrder.origQty) -
+              Number(orderUpdate.originalQuantity)
+          );
+
+          this.#orders[ordersDataIndex].mainOrder.origQty = newPositionSize;
+        }
+
+        //Тейк-профит
+        if (isTpOrder) {
+          console.log("Это ТП");
+
+          //Обновляем статистику
+          this.#orders[ordersDataIndex].statistics.profit += Number(
+            orderUpdate.realizedProfit
+          );
+
+          if (orderUpdate.commission) {
+            this.#orders[ordersDataIndex].statistics.commission += Number(
+              orderUpdate.commission
+            );
           }
 
-          //Тейк-профит
-          if (isTpOrder) {
-            console.log("Это ТП");
-
-            //Обновляем статистику
-            this.#orders[ordersDataIndex].statistics.profit += Number(
-              orderUpdate.realizedProfit
-            );
-
-            if (orderUpdate.commission) {
-              this.#orders[ordersDataIndex].statistics.commission += Number(
-                orderUpdate.commission
-              );
+          //Закрыть стоплоссы
+          const cancelStoplossResponse = await this.#binance.futuresCancel(
+            ordersData.symbol,
+            {
+              orderId: ordersData.subOrders.sl.orderId,
             }
+          );
 
-            //Закрыть стоплоссы
-            const cancelStoplossResponse = await this.#binance.futuresCancel(
-              ordersData.symbol,
-              {
-                orderId: ordersData.subOrders.sl.orderId,
-              }
-            );
+          //Позиция полностью закрылась
+          if (ordersData.mainOrder.origQty === 0) {
+            console.log("Position closed by TP");
 
-            //Позиция полностью закрылась
-            if (ordersData.mainOrder.origQty === 0) {
-              console.log("Position closed by TP");
-
-              await TradingHistoryModel.create({
-                ...this.#orders[ordersDataIndex].statistics,
-                channelName: this.#orders[ordersDataIndex].channelName,
-                timestamp: Date.now(),
-              });
-
-              this.#orders.splice(ordersDataIndex, 1);
-              return;
-            }
-
-            //Выставляем новый стоплосс
-            const newSLOrder = [
-              {
-                symbol: ordersData.subOrders.sl.symbol,
-                side: ordersData.subOrders.sl.side,
-                type: ordersData.subOrders.sl.origType,
-                quantity: String(
-                  this.#orders[ordersDataIndex].mainOrder.origQty
-                ),
-                positionSide: ordersData.subOrders.sl.positionSide,
-              },
-            ];
-
-            switch (newSLOrder[0].type) {
-              case "STOP_MARKET":
-                if (isTpOrder.breakeven) {
-                  newSLOrder[0].stopPrice = ordersData.mainOrder.price;
-                  ordersData.subOrders.sl.stopPrice =
-                    ordersData.mainOrder.price;
-                } else {
-                  newSLOrder[0].stopPrice = ordersData.subOrders.sl.stopPrice;
-                }
-                break;
-
-              case "TRAILING_STOP_MARKET":
-                newSLOrder[0].callbackRate = ordersData.subOrders.sl.priceRate;
-                break;
-            }
-
-            const binanceResponse = (
-              await this.#binance.futuresMultipleOrders(newSLOrder)
-            )[0];
-
-            console.log("new sl", binanceResponse);
-
-            this.#orders[ordersDataIndex].subOrders.sl = binanceResponse;
-
-            return;
-          }
-
-          if (isSlOrder) {
-            console.log("Это СЛ");
-
-            //Обновляем статистику
-            this.#orders[ordersDataIndex].statistics.profit += Number(
-              orderUpdate.realizedProfit
-            );
-
-            if (orderUpdate.commission) {
-              this.#orders[ordersDataIndex].statistics.commission += Number(
-                orderUpdate.commission
-              );
-            }
-
-            //Отменяем тейкпрофиты
-            for (const tpOrder of ordersData.subOrders.tps) {
-              const cancelTakeprofitResponse =
-                await this.#binance.futuresCancel(ordersData.symbol, {
-                  orderId: tpOrder.orderId,
-                });
-            }
-
-            //Позиция полностью закрылась
             await TradingHistoryModel.create({
               ...this.#orders[ordersDataIndex].statistics,
               channelName: this.#orders[ordersDataIndex].channelName,
@@ -490,11 +442,84 @@ class BinanceTradingService {
             });
 
             this.#orders.splice(ordersDataIndex, 1);
-            return;
+            return resolve();
           }
+
+          //Выставляем новый стоплосс
+          const newSLOrder = [
+            {
+              symbol: ordersData.subOrders.sl.symbol,
+              side: ordersData.subOrders.sl.side,
+              type: ordersData.subOrders.sl.origType,
+              quantity: String(this.#orders[ordersDataIndex].mainOrder.origQty),
+              positionSide: ordersData.subOrders.sl.positionSide,
+            },
+          ];
+
+          switch (newSLOrder[0].type) {
+            case "STOP_MARKET":
+              if (isTpOrder.breakeven) {
+                newSLOrder[0].stopPrice = ordersData.mainOrder.price;
+                ordersData.subOrders.sl.stopPrice = ordersData.mainOrder.price;
+              } else {
+                newSLOrder[0].stopPrice = ordersData.subOrders.sl.stopPrice;
+              }
+              break;
+
+            case "TRAILING_STOP_MARKET":
+              newSLOrder[0].callbackRate = ordersData.subOrders.sl.priceRate;
+              break;
+          }
+
+          const binanceResponse = (
+            await this.#binance.futuresMultipleOrders(newSLOrder)
+          )[0];
+
+          console.log("new sl", binanceResponse);
+
+          this.#orders[ordersDataIndex].subOrders.sl = binanceResponse;
+
+          return resolve();
+        }
+
+        if (isSlOrder) {
+          console.log("Это СЛ");
+
+          //Обновляем статистику
+          this.#orders[ordersDataIndex].statistics.profit += Number(
+            orderUpdate.realizedProfit
+          );
+
+          if (orderUpdate.commission) {
+            this.#orders[ordersDataIndex].statistics.commission += Number(
+              orderUpdate.commission
+            );
+          }
+
+          //Отменяем тейкпрофиты
+          for (const tpOrder of ordersData.subOrders.tps) {
+            const cancelTakeprofitResponse = await this.#binance.futuresCancel(
+              ordersData.symbol,
+              {
+                orderId: tpOrder.orderId,
+              }
+            );
+          }
+
+          //Позиция полностью закрылась
+          await TradingHistoryModel.create({
+            ...this.#orders[ordersDataIndex].statistics,
+            channelName: this.#orders[ordersDataIndex].channelName,
+            timestamp: Date.now(),
+          });
+
+          this.#orders.splice(ordersDataIndex, 1);
+          return resolve();
         }
       }
-    );
+
+      resolve();
+    });
   }
 
   /**
@@ -549,17 +574,19 @@ class BinanceTradingService {
 
     if (!ordersData) return;
 
+    const closeMainOrder = {
+      symbol: signalData.symbol,
+      side: ordersData.mainOrder.side === "BUY" ? "SELL" : "BUY",
+      type: "MARKET",
+      quantity: String(ordersData.mainOrder.origQty),
+      positionSide: ordersData.mainOrder.positionSide,
+    };
+
+    console.log(closeMainOrder);
+
     //Закрытие позиции
     const mainCloseResponse = (
-      await this.#binance.futuresMultipleOrders([
-        {
-          symbol: signalData.symbol,
-          side: ordersData.mainOrder.side === "BUY" ? "SELL" : "BUY",
-          type: "MARKET",
-          quantity: ordersData.mainOrder.origQty,
-          positionSide: ordersData.mainOrder.positionSide,
-        },
-      ])
+      await this.#binance.futuresMultipleOrders([closeMainOrder])
     )[0];
 
     mainCloseResponse.channelName = signalData.channelName;

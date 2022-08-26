@@ -6,6 +6,7 @@ const tokenService = require("./token.service");
 const TelegramAccountModel = require("../models/telegramAccount.model");
 const TelegramTradingChannelsModel = require("../models/telegramTradingChannels.model");
 const BinanceAccountModel = require("../models/binanceAccount.model");
+const tradeHistoryModel = require("../models/tradeHistory.model");
 
 class TradingService {
   async startBotsFromDB() {
@@ -73,6 +74,12 @@ class TradingService {
         binanceSettings: userChannel.binanceSettings,
       };
     });
+  }
+
+  async getTradingHistory(accessToken) {
+    const userData = tokenService.validateAccessToken(accessToken);
+
+    return await tradeHistoryModel.find({ user: userData.id });
   }
 
   async addChannel(accessToken, telegramSettings, binanceSettings) {
