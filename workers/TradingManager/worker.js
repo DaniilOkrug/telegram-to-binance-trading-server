@@ -7,6 +7,7 @@ const { StringSession } = require("telegram/sessions");
 
 const SignalService = require("./services/signal.service");
 const BinanceTradingService = require("./services/binanceTrading.service");
+const { logger } = require("../../util/logger");
 
 console.log("TradingWorker started");
 const INITIAL_SETTINGS = JSON.parse(workerData);
@@ -87,6 +88,7 @@ let pairs = [];
           const messageText = event.message.message;
 
           console.log("New signal message: ", messageText);
+          logger.info("New signal message: " + messageText);
 
           const signalData = SignalService.determineSignal(messageText, {
             pairs,
@@ -96,9 +98,11 @@ let pairs = [];
             closeWords: INITIAL_SETTINGS.telegramSettings.closeWords,
           });
 
+          
           signalData.channelName = channelSettings.telegramSettings.channelName;
-
+          
           console.log(signalData);
+          logger.info(signalData);
 
           if (signalData.isSignal) {
             if (signalData.isClose) {
@@ -120,6 +124,7 @@ let pairs = [];
     });
   } catch (error) {
     console.error(error);
+    logger.error(error);
 
     setTimeout(() => {
       parentPort.postMessage({

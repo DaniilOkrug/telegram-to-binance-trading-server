@@ -1,6 +1,7 @@
 const Binance = require("node-binance-api");
 const { toSignedLittleBuffer } = require("telegram/Helpers");
 const TradingHistoryModel = require("../../../models/tradeHistory.model");
+const { logger } = require("../../../util/logger");
 
 class BinanceTradingService {
   #options;
@@ -39,6 +40,9 @@ class BinanceTradingService {
         signalData.symbol,
         binanceSettings.leverage
       );
+
+      //Задаем вид маржи
+      await this.#binance.futuresMarginType(signalData.symbol, 'ISOLATED');
 
       const price = (await this.#binance.futuresPrices())[signalData.symbol];
 
@@ -191,6 +195,7 @@ class BinanceTradingService {
       }
 
       console.log(orders);
+      logger.info(orders);
 
       const ordersResponse = await this.placeMultipleOrders(orders);
 
@@ -208,7 +213,7 @@ class BinanceTradingService {
       //Проверка ошибки при выставлении оредров
       for (const binanceResponse of ordersResponse) {
         if (!binanceResponse.orderId) {
-          //   logger.error(binanceLongResponse);
+          logger.error(binanceResponse);
           console.log("Canceling all orders due to one of the orders error!");
 
           //Закрытие позиции
@@ -326,7 +331,7 @@ class BinanceTradingService {
             }
           }
 
-          console.log('exit', this.#taskProcessingStatus);
+          console.log("exit", this.#taskProcessingStatus);
         }
       }
     );
@@ -555,6 +560,7 @@ class BinanceTradingService {
         resolve(responses);
       } catch (error) {
         console.log(error);
+        logger.error(error);
         resolve([
           {
             type: "ERROR",
@@ -659,7 +665,7 @@ class BinanceTradingService {
         resolve(volume);
       } catch (err) {
         console.log(err);
-
+        logger.error(err);
         //! При ошибке возвращает первоначальный объем
         resolve(volume);
       }
@@ -699,6 +705,7 @@ class BinanceTradingService {
         resolve(price);
       } catch (err) {
         console.log(err);
+        logger.error(err);
         reject(err);
       }
     });

@@ -42,6 +42,8 @@ class SignalService {
   }
 
   isSignal(message, words) {
+    if (words.length === 0) return false;
+
     const wordsArr = Array.isArray(words)
       ? words
       : TelegramSettingsMiddleWare.parseSignalWords(words);

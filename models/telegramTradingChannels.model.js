@@ -19,9 +19,9 @@ const TelegramTradingChannelsShema = new Schema({
 
   telegramSettings: {
     channelName: { type: String, required: true },
-    signalWordsLong: { type: String, required: true },
-    signalWordsShort: { type: String, required: true },
-    closeWords: { type: String, required: true },
+    signalWordsLong: { type: String, required: false },
+    signalWordsShort: { type: String, required: false },
+    closeWords: { type: String, required: false },
   },
 
   binanceSettings: {

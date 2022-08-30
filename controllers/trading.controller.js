@@ -48,7 +48,7 @@ class TradingController {
       if (!accessToken) throw ApiError.UnauthorizedError("Вы не авторизованы");
 
       const { telegramSettings, binanceSettings } = req.body;
-
+      
       const response = await TradingService.addChannel(
         accessToken,
         telegramSettings,

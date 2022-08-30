@@ -9,6 +9,8 @@ const TelegramAccountModel = require("../../models/telegramAccount.model");
 const tokenService = require("../../services/token.service");
 const TradingHistoryModel = require("../../models/tradeHistory.model");
 
+const { logger } = require("../../util/logger");
+
 console.log("Telegram Connection Worker started");
 
 const stringSession = new StringSession("");
@@ -53,6 +55,7 @@ parentPort.on("message", async (code) => {
       },
       onError: async (err) => {
         console.log(err);
+        logger.error(err);
 
         switch (err.code) {
           case 420:
@@ -118,6 +121,7 @@ parentPort.on("message", async (code) => {
     parentPort.close();
   } catch (err) {
     console.error(err);
+    logger.error(err)
 
     parentPort.postMessage({
       type: "ERROR",
