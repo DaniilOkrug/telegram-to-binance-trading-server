@@ -2,6 +2,7 @@ const { Worker } = require("worker_threads");
 
 class TelegramConnectionManager {
   #workers = [];
+  #isSendingCodeCompleted = []; //ApiIds
 
   createWorker(accessToken, apiId, apiHash, phoneNumber) {
     return new Promise((resolve, reject) => {
@@ -34,34 +35,47 @@ class TelegramConnectionManager {
 
           switch (task.type) {
             case "CONNECTION":
+              workerInfo = this.#workers.find((data) => data.apiId === apiId);
+              index = this.#workers.indexOf(workerInfo);
+
+              this.#workers[index].isConnectionRequest = false;
+
               return resolve(task);
 
             case "CODE_CONFIRMED":
               workerInfo = this.#workers.find((data) => data.apiId === apiId);
               index = this.#workers.indexOf(workerInfo);
 
-              this.#workers[index].sendingCodeResponse = task;
-              this.#workers[index].isSendingCodeCompleted = true;
+              this.#isSendingCodeCompleted.push({
+                apiId,
+                response: task,
+              });
               break;
 
             case "ERROR":
               workerInfo = this.#workers.find((data) => data.apiId === apiId);
               index = this.#workers.indexOf(workerInfo);
 
-              if (workerInfo.isConnectionRequest) {
+              if (this.#workers[index].isConnectionRequest) {
                 this.#workers[index].isConnectionRequest = false;
                 return resolve(task);
               }
 
               if (this.#workers[index].isSendingCode) {
-                this.#workers[index].sendingCodeResponse = task;
-                this.#workers[index].isSendingCodeCompleted = true;
+                this.#isSendingCodeCompleted.push({
+                  apiId,
+                  response: task,
+                });
               }
               break;
 
             case "TERMINATE":
               setTimeout(() => {
                 worker.terminate();
+
+                if (task.deleteWorker) {
+                  this.deleteWorkerFromArray(apiId, apiHash);
+                }
               }, 1000);
               return;
 
@@ -83,24 +97,58 @@ class TelegramConnectionManager {
       const index = this.#workers.indexOf(workerInfo);
 
       this.#workers[index].isSendingCode = true;
-      this.#workers[index].isSendingCodeCompleted = false;
 
       this.#workers[index].instance.postMessage(authCode);
 
       const waitResponse = () => {
         return new Promise((resolveWait) => {
           setInterval(() => {
-            if (this.#workers[index].isSendingCodeCompleted) resolveWait();
+            const includedCodeData = this.#isSendingCodeCompleted.find(
+              (data) => data.apiId === apiId
+            );
+            const includedCodeIndex =
+              this.#isSendingCodeCompleted.indexOf(includedCodeData);
+
+            if (includedCodeIndex > -1) {
+              resolveWait(
+                this.#isSendingCodeCompleted[includedCodeIndex].response
+              );
+              this.#isSendingCodeCompleted.splice(includedCodeIndex, 1);
+            }
           }, 1000);
         });
       };
 
-      await waitResponse();
+      const response = await waitResponse();
 
       console.log("Code confirmed wait response finished");
 
-      resolve(this.#workers[index].sendingCodeResponse);
+      resolve(response);
+
+      this.deleteWorkerFromArray(apiId, apiHash);
     });
+  }
+
+  closeConnection(apiId, apiHash) {
+    const workerInfo = this.#workers.find(
+      (data) => data.apiId === apiId && data.apiHash === apiHash
+    );
+    const index = this.#workers.indexOf(workerInfo);
+
+    if (index > -1) {
+      this.#workers[index].instance.terminate();
+    }
+  }
+
+  deleteWorkerFromArray(apiId, apiHash) {
+    const workerInfo = this.#workers.find(
+      (data) => data.apiId === apiId && data.apiHash === apiHash
+    );
+    const index = this.#workers.indexOf(workerInfo);
+
+    if (index > -1) {
+      this.#workers.splice(index, 1);
+    }
   }
 }
 

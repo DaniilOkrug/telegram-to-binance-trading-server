@@ -17,13 +17,15 @@ class TelegramController {
         phoneNumber
       );
 
+      console.log("response", response);
+
       if (response.type === "CONNECTION") {
         return res.json({
           status: "Connection opened",
         });
       }
 
-      console.log('connect response', response);
+      console.log("connect response", response);
 
       if (response.type === "ERROR") {
         return next(ApiError.BadRequest(response.message));

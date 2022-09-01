@@ -68,7 +68,7 @@ parentPort.on("message", async (code) => {
           case 400:
             parentPort.postMessage({
               type: "ERROR",
-              message: "Неверный API Id",
+              message: "Неверные данные для подключения",
             });
             break;
 
@@ -79,8 +79,7 @@ parentPort.on("message", async (code) => {
             });
         }
 
-        parentPort.postMessage({ type: "TERMINATE" });
-        parentPort.close();
+        terminateWorker();
       },
     });
 
@@ -117,18 +116,17 @@ parentPort.on("message", async (code) => {
 
     await client.sendMessage("me", { message: "Telegram Trade подключен!" });
 
-    parentPort.postMessage({ type: "TERMINATE" });
-    parentPort.close();
+    terminateWorker();
   } catch (err) {
     console.error(err);
-    logger.error(err)
+    logger.error(err);
 
     parentPort.postMessage({
       type: "ERROR",
       message: "Ошибка подключения",
     });
 
-    parentPort.postMessage({ type: "TERMINATE" });
+    terminateWorker();
   }
 })();
 
@@ -138,6 +136,10 @@ function waitCode() {
       if (!waitAuthCode) resolve();
     }, 1000);
   });
+}
+
+function terminateWorker() {
+  parentPort.postMessage({ type: "TERMINATE" });
 }
 
 function sleep(ms) {
