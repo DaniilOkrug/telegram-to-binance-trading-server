@@ -235,6 +235,54 @@ class TradingManager {
       resolve(this.#workers[workerIndex].deleteChannel.response);
     });
   }
+
+  editChannel(userId, binanceSettings, telegramSettings) {
+    return new Promise(async (resolve, reject) => {
+      const userWorker = this.#workers.find((data) => data.userId === userId);
+
+      if (!userWorker) {
+        throw ApiError.BadRequest("Не удалось удалить канал!");
+      }
+
+      const workerIndex = this.#workers.indexOf(userWorker);
+      this.#workers[workerIndex].editChannel = {
+        waitResponse: true,
+      };
+
+      userWorker.instance.postMessage(
+        JSON.stringify({
+          type: "EDIT_CHANNEL",
+          message: {
+            binanceSettings,
+            telegramSettings,
+          },
+          field: "editChannel",
+        })
+      );
+
+      const waitResponse = () => {
+        return new Promise((resolveWait) => {
+          const timer = setInterval(() => {
+            if (!this.#workers[workerIndex].editChannel.waitResponse)
+              resolveWait();
+            clearInterval(timer);
+          }, 200);
+        });
+      };
+
+      await waitResponse();
+
+      resolve(this.#workers[workerIndex].editChannel.response);
+    });
+  }
+
+  // restartWorkers(userId, ) {
+  //   const userWorker = this.#workers.find((data) => data.userId === userId);
+
+  //   userWorker.instance.terminate();
+
+    
+  // }
 }
 
 class Singleton {

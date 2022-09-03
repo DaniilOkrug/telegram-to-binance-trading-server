@@ -1,5 +1,7 @@
 const Binance = require("node-binance-api");
 const TokenService = require("./token.service");
+const TradingManager = require("../workers/TradingManager/index");
+
 const BinanceAccountModel = require("../models/binanceAccount.model");
 const binanceAccountModel = require("../models/binanceAccount.model");
 

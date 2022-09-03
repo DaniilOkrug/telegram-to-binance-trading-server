@@ -209,6 +209,58 @@ class TradingService {
     return await this.getChannels(accessToken);
   }
 
+  //!! нужно закончить
+  async editChannel(accessToken, telegramSettings, binanceSettings) {
+    const signalWordsLongArr = TelegramSettingsMiddleware.parseSignalWords(
+      telegramSettings.signalWordsLong
+    );
+    const signalWordsShortArr = TelegramSettingsMiddleware.parseSignalWords(
+      telegramSettings.signalWordsShort
+    );
+
+    if (signalWordsLongArr.length === 0 && signalWordsShortArr.length === 0)
+      throw ApiError.BadRequest("Сигнальные слова неверные");
+
+    if (telegramSettings.channelName === "")
+      throw ApiError.BadRequest("Некорретное название канала");
+
+    const userData = tokenService.validateAccessToken(accessToken);
+
+    const userChannelsData = await TelegramTradingChannelsModel.find({
+      user: userData.id,
+    });
+
+    if (userChannelsData.length === 0)
+      throw ApiError.BadRequest("Не найдены каналы пользователя");
+
+    let channelData;
+    for (const userChannel of userChannelsData) {
+      if (userChannel.telegramSettings.channelName === telegramSettings.channelName) {
+        channelData = userChannel;
+        break;
+      }
+    }
+
+    if (!channelData) throw ApiError.BadRequest("Не найден канал для удаления");
+
+    const response = await TradingManager.editChannel(
+      userData.id,
+      binanceSettings,
+      telegramSettings
+    );
+
+    if (response.type === "ERROR") throw ApiError.BadRequest(response.message);
+
+    await TelegramTradingChannelsModel.findByIdAndUpdate(channelData.id, {
+      user: userData.id,
+      status: "Active",
+      binanceSettings,
+      telegramSettings,
+    });
+
+    return await this.getChannels(accessToken);
+  }
+
   async getAccountStatus(accessToken) {
     const userData = tokenService.validateAccessToken(accessToken);
 

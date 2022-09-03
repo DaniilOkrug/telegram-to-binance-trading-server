@@ -10,6 +10,8 @@ class TelegramService {
       phoneNumber
     );
 
+    console.log('serviece Connection response', response);
+
     return response;
   }
 

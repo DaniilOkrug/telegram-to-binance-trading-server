@@ -48,7 +48,7 @@ class TradingController {
       if (!accessToken) throw ApiError.UnauthorizedError("Вы не авторизованы");
 
       const { telegramSettings, binanceSettings } = req.body;
-      
+
       const response = await TradingService.addChannel(
         accessToken,
         telegramSettings,
@@ -71,6 +71,25 @@ class TradingController {
       const response = await TradingService.deleteChannel(
         accessToken,
         channelName
+      );
+
+      return res.json(response);
+    } catch (e) {
+      next(e);
+    }
+  }
+
+  async editChannel(req, res, next) {
+    try {
+      const accessToken = tokenService.getAccessTokenFromRequest(req);
+      if (!accessToken) throw ApiError.UnauthorizedError("Вы не авторизованы");
+
+      const { telegramSettings, binanceSettings } = req.body;
+
+      const response = await TradingService.editChannel(
+        accessToken,
+        telegramSettings,
+        binanceSettings
       );
 
       return res.json(response);

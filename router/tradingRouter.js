@@ -10,7 +10,8 @@ tradingRouter.get('/getTradingHistory', authMiddleware, TradingController.getTra
 tradingRouter.get('/getAccountStatus', authMiddleware, TradingController.getAccountStatus);
 tradingRouter.post('/addChannel', authMiddleware, TradingController.addChannel);
 tradingRouter.post('/deleteChannel', authMiddleware, TradingController.deleteChannel);
-tradingRouter.post('/stopChannel', authMiddleware, TradingController.stopChannel);
+tradingRouter.post('/editChannel', authMiddleware, TradingController.editChannel); //!!
+tradingRouter.post('/stopChannel', authMiddleware, TradingController.stopChannel); //!!
 
 
 module.exports = tradingRouter;

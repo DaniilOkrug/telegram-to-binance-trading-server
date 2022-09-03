@@ -92,15 +92,13 @@ let pairs = [];
 
           const signalData = SignalService.determineSignal(messageText, {
             pairs,
-            signalWordsLong: INITIAL_SETTINGS.telegramSettings.signalWordsLong,
-            signalWordsShort:
-              INITIAL_SETTINGS.telegramSettings.signalWordsShort,
-            closeWords: INITIAL_SETTINGS.telegramSettings.closeWords,
+            signalWordsLong: channelSettings.telegramSettings.signalWordsLong,
+            signalWordsShort: channelSettings.telegramSettings.signalWordsShort,
+            closeWords: channelSettings.telegramSettings.closeWords,
           });
 
-          
           signalData.channelName = channelSettings.telegramSettings.channelName;
-          
+
           console.log(signalData);
           logger.info(signalData);
 
@@ -141,6 +139,8 @@ let pairs = [];
 parentPort.on("message", (taskString) => {
   const task = JSON.parse(taskString);
 
+  let channel;
+  let channelIndex;
   switch (task.type) {
     case "ADD_CHANNEL":
       channelsSettings.push(task.message);
@@ -152,10 +152,10 @@ parentPort.on("message", (taskString) => {
       break;
 
     case "DELETE_CHANNEL":
-      const channel = channelsSettings.find(
+      channel = channelsSettings.find(
         (data) => data.telegramSettings.channelName === task.message.channelName
       );
-      const channelIndex = channelsSettings.indexOf(channel);
+      channelIndex = channelsSettings.indexOf(channel);
 
       if (channelIndex > -1) {
         channelsSettings.splice(channelIndex, 1);
@@ -173,6 +173,27 @@ parentPort.on("message", (taskString) => {
           isError: true,
         });
       }
+      break;
+
+    case "EDIT_CHANNEL":
+      channel = channelsSettings.find(
+        (data) =>
+          data.telegramSettings.channelName ===
+          task.message.telegramSettings.channelName
+      );
+      channelIndex = channelsSettings.indexOf(channel);
+
+      channelsSettings[channelIndex].telegramSettings =
+        task.message.telegramSettings;
+      channelsSettings[channelIndex].binanceSettings =
+        task.message.binanceSettings;
+
+      parentPort.postMessage({
+        type: "CHANNEL_RESPONSE",
+        message: "Канал изменен",
+        field: task.field,
+      });
+
       break;
 
     default:

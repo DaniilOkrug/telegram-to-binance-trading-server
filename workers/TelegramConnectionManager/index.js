@@ -56,8 +56,11 @@ class TelegramConnectionManager {
               workerInfo = this.#workers.find((data) => data.apiId === apiId);
               index = this.#workers.indexOf(workerInfo);
 
+              console.log('connection error');
+
               if (this.#workers[index].isConnectionRequest) {
                 this.#workers[index].isConnectionRequest = false;
+                console.log('isConnectionRequest');
                 return resolve(task);
               }
 
@@ -73,9 +76,7 @@ class TelegramConnectionManager {
               setTimeout(() => {
                 worker.terminate();
 
-                if (task.deleteWorker) {
-                  this.deleteWorkerFromArray(apiId, apiHash);
-                }
+                this.deleteWorkerFromArray(apiId, apiHash);
               }, 1000);
               return;
 
@@ -115,7 +116,7 @@ class TelegramConnectionManager {
               );
               this.#isSendingCodeCompleted.splice(includedCodeIndex, 1);
             }
-          }, 1000);
+          }, 100);
         });
       };
 
